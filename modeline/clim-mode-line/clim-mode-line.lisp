@@ -23,8 +23,9 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (define-application-frame mode-line ()
   ((formatters :initform (list (list 'format-groups
+                                     'format-windows
                                      'format-align-right
-                                     'format-windows))
+                                     'format-groups))
                :initarg :formatters
                :accessor mode-line-formatters)
    (color-stack :initform nil
@@ -49,7 +50,10 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (defmethod (setf mode-line-formatters) (new (frame mode-line))
   (sb-thread:with-mutex ((mode-line-mutex frame))
-    (setf (slot-value frame 'formatters) new)
+    (setf (slot-value frame 'formatters) new
+          ;; (medium-background (find-pane-named frame 'display))
+          ;; (mode-line-background-color frame)
+          )
     (redisplay-frame-panes frame :force-p t)
     (stumpwm:call-in-main-thread
      (lambda ()
@@ -90,15 +94,7 @@ formatted to the output stream in between each formatter when in text mode.")
                       (make-text-style "DejaVu Sans Mono" "Book" 14)
                       ;; (make-text-style nil nil nil) ; use default text style
                       )
-      (display-mode-line-as-text frame pane)
-      ;; (funcall *mode-line-display-function* frame pane)
-      )))
-
-(defun display-mode-line-as-table (frame pane)
-  (with-table (pane)
-    (dolist (line (mode-line-formatters frame))
-      (with-table-row ()
-        (funcall (car line) frame pane (cdr line))))))
+      (display-mode-line-as-text frame pane))))
 
 (defun display-mode-line-as-text (frame pane)
   (dolist (line (mode-line-formatters frame))

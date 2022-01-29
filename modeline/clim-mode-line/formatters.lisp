@@ -1,104 +1,7 @@
 (in-package #:clim-mode-line)
 
-;; (defun invoke-with-normal-stumpwm-highlighting (pane highlight-thunk continuation)
-;;   "When HIGHLIGHT-THUNK is returns true, invoke CONTINUATION with the StumpWM
-;; manner of highlighting, by swapping the foreground and the background. If this is 
-;; called within a table, invoke CONTINUATION within a cell."
-;;   (flet ((continue-processing ()
-;;            (with-cell (pane)
-;;              (funcall continuation))))
-;;     (declare (dynamic-extent (function continue-processing)))
-;;     (if (funcall highlight-thunk)
-;;         (surrounding-output-with-border (pane :filled t
-;;                                               :move-cursor nil
-;;                                               :ink *foreground-color*)
-;;           (with-drawing-options (pane :ink *background-color*)
-;;             (continue-processing)))
-;;         ;; (with-colors (pane *foreground-color* *background-color*)
-;;         ;;   (continue-processing))
-;;         ;; (with-inverted-ink (pane)
-;;         ;;   (continue-processing))
-;;         (continue-processing))))
-
-;; (defmacro with-normal-stumpwm-highlighting ((pane highlight-when)
-;;                                             &body body)
-;;   (alexandria:with-gensyms (continuation highlight-thunk)
-;;     `(flet ((,continuation ()
-;;               ,@body)
-;;             (,highlight-thunk ()
-;;               ,highlight-when))
-;;        (declare (dynamic-extent (function ,continuation)
-;;                                 (function ,highlight-thunk)))
-;;        (invoke-with-normal-stumpwm-highlighting ,pane
-;;                                                 #',highlight-thunk
-;;                                                 #',continuation))))
-
-;; (defun invoke-with-thin-stumpwm-highlighting (pane highlight cont)
-;;   (flet ((continue-processing ()
-;;            (with-cell (pane)
-;;              (funcall cont))))
-;;     (declare (dynamic-extent (function continue-processing)))
-;;     (if (funcall highlight)
-;;         (let ((record (with-undrawn-output-record (pane)
-;;                         (with-drawing-options (pane :ink +background-ink+)
-;;                           (continue-processing)))))
-;;           (with-output-record-bounds (x y w h) record
-;;             (draw-rectangle* pane x y (+ x w) (+ y h))
-;;             (replay record pane)))
-;;         (continue-processing))))
-
-;; (defmacro with-thin-stumpwm-highlighting ((pane highlight-when) &body body)
-;;   (alexandria:with-gensyms (continuation highlight)
-;;     `(flet ((,continuation ()
-;;               ,@body)
-;;             (,highlight ()
-;;               ,highlight-when))
-;;        (declare (dynamic-extent (function ,continuation)
-;;                                 (function ,highlight)))
-;;        (invoke-with-thin-stumpwm-highlighting ,pane
-;;                                               #',highlight
-;;                                               #',continuation))))
-
-;; (defun invoke-with-stumpwm-highlighting (pane highlight cont style)
-;;   (case style
-;;     ((:normal :thick)
-;;      (invoke-with-normal-stumpwm-highlighting pane highlight cont))
-;;     ((:thin)
-;;      (invoke-with-thin-stumpwm-highlighting pane highlight cont))))
-
-;; (defmacro with-stumpwm-highlighting ((pane highlight-when
-;;                                       &optional (style :normal))
-;;                                      &body body)
-;;   (alexandria:with-gensyms (continuation highlight-thunk contarg)
-;;     `(flet ((,continuation (&rest ,contarg)
-;;               (declare (ignore ,contarg))
-;;               ,@body)
-;;             (,highlight-thunk ()
-;;               ,highlight-when))
-;;        (declare (dynamic-extent (function ,continuation)
-;;                                 (function ,highlight-thunk)))
-;;        (invoke-with-stumpwm-highlighting ,pane
-;;                                          #',highlight-thunk
-;;                                          #',continuation
-;;                                          ,style))))
-
-;; (defun invoke-with-stumpwm-formatting (pane continuation)
-;;   (with-cell (pane)
-;;     (funcall continuation)))
-
-;; (defmacro with-stumpwm-formatting ((pane &key (highlight nil) (style :normal))
-;;                                    &body body)
-;;   (alexandria:with-gensyms (cont high)
-;;     `(flet ((,cont ()
-;;               ,@body)
-;;             ,@(when highlight
-;;                 `((,high () ,highlight))))
-;;        (declare (dynamic-extent (function ,cont)
-;;                                 ,@(when highlight
-;;                                     `((function ,high)))))
-;;        ,(if highlight
-;;             `(invoke-with-stumpwm-highlighting ,pane #',high #',cont ,style)
-;;             `(invoke-with-stumpwm-formatting ,pane #',cont)))))
+;; (defun draw-background (frame pane)
+;;   (let (())))
 
 (defun invoke-with-stumpwm-formatting (pane cont highlight-when)
   (let ((highlight (funcall highlight-when)))
@@ -133,15 +36,11 @@
 (defmacro define-simple-formatter (name string)
   `(define-formatter (,(intern (format nil "FORMAT-~A" name))) (frame pane)
      (with-stumpwm-formatting (pane)
-       (format pane "~A" ,string))
-     ;; (if *display-as-table*
-     ;;     (with-cell ()
-     ;;       (format pane "~A" ,string))
-     ;;     (format pane "~A" ,string))
-     ))
+       (format pane "~A" ,string))))
 
-(defun call-next-formatter (formatter-list frame pane)
-  (when (eql *display-style* :text)
+(defun call-next-formatter (formatter-list frame pane
+                            &optional (display-delimiter t))
+  (when display-delimiter
     (format pane "~A" *text-display-formatter-intermix*))
   (when formatter-list
     (funcall (car formatter-list) frame pane (cdr formatter-list))))
@@ -156,28 +55,63 @@
 (define-formatter (format-align-right :auto-call-continuation nil)
     (frame pane rest)
   (with-right-alignment (frame pane)
-    (call-next-formatter rest frame pane)))
+    (call-next-formatter rest frame pane nil)))
 
 (define-formatter (format-with-colors :auto-call-continuation nil)
     (frame pane rest)
   (let ((*foreground-color* (mode-line-foreground-color frame))
         (*background-color* (mode-line-background-color frame)))
-    (call-next-formatter rest frame pane))
-  ;; (with-colors (pane (mode-line-foreground-color frame)
-  ;;                    (mode-line-background-color frame))
-  ;;   (call-next-formatter rest frame pane))
-  )
+    (call-next-formatter rest frame pane nil)))
 
 (defun make-color-formatter (foreground-ink background-ink)
   (lambda (frame pane rest)
-    (with-colors (pane foreground-ink background-ink)
-      (call-next-formatter rest frame pane))
-    ;; (let ((*foreground-color* foreground-ink)
-    ;;       (*background-color* background-ink))
-    ;;   (call-next-formatter rest frame pane))
-    ;; (with-colors (pane foreground-ink background-ink)
-    ;;   (call-next-formatter rest frame pane))
-    ))
+    (let ((*foreground-color* foreground-ink)
+          (*background-color* background-ink))
+      ;; (setf (medium-background pane) background-ink
+      ;;       (medium-foreground pane) foreground-ink)
+      (let ((climi::*foreground-ink* foreground-ink)
+            (climi::*background-ink* background-ink))
+        (call-next-formatter rest frame pane nil)))))
+
+(defun format-tester-1 (f p r)
+  (surrounding-output-with-border (p :move-cursor nil)
+    (format p "Hey there"))
+  (call-next-formatter r f p))
+
+(defun format-groups-test (frame pane others)
+  (declare (ignore frame))
+  ;; (let ())
+  (let ((current-group (stumpwm:current-group)))
+    (do-list-with-interspersed-element
+        (group (stumpwm::sort-groups (stumpwm:current-screen))
+          (format pane " "))
+      ;; (let ((record
+      ;;         (with-undrawn-output-record (pane)
+      ;;           (format pane "~A" (stumpwm:group-name group))))))
+      (surrounding-output-with-border (pane :move-cursor nil
+                                            :filled t
+                                            :ink +black+)
+        (format pane "~A" (stumpwm::group-name group)))
+      
+      ;; (if (eq current-group group)
+      ;;     (let* ((tmp *foreground-color*)
+      ;;            (*foreground-color* *background-color*)
+      ;;            (*background-color* tmp))
+      ;;       (present group 'stumpwm::group :stream pane :single-box t))
+      ;;     (present group 'stumpwm::group :stream pane :single-box t))
+      ;; (with-stumpwm-formatting (pane :highlight (eq current-group group))
+      ;;   (present group 'stumpwm::group :stream pane :single-box t))
+      ))
+  
+  
+  ;; (make-clim-application-pane
+  ;;  :scroll-bars nil
+  ;;  :foreground *foreground-color*
+  ;;  :background *background-color*
+  ;;  :display-function
+  ;;  (lambda (frame pane)
+  ;;    ))
+  (call-next-formatter others frame pane))
 
 (defun format-groups (frame pane other-formatters)
   (declare (ignorable frame))
@@ -185,8 +119,15 @@
     (do-list-with-interspersed-element
         (group (stumpwm::sort-groups (stumpwm:current-screen))
           (format pane " "))
-      (with-stumpwm-formatting (pane :highlight (eq current-group group))
-        (present group 'stumpwm::group :stream pane :single-box t))))
+      (if (eq current-group group)
+          (let* ((tmp *foreground-color*)
+                 (*foreground-color* *background-color*)
+                 (*background-color* tmp))
+            (present group 'stumpwm::group :stream pane :single-box t))
+          (present group 'stumpwm::group :stream pane :single-box t))
+      ;; (with-stumpwm-formatting (pane :highlight (eq current-group group))
+      ;;   (present group 'stumpwm::group :stream pane :single-box t))
+      ))
   (call-next-formatter other-formatters frame pane))
 
 (defun format-windows (frame pane other-formatters)
@@ -195,8 +136,10 @@
         (win (stumpwm::sort-windows-by-number
               (stumpwm:group-windows (stumpwm:current-group)))
           (format pane " "))
+      ;; (present win 'stumpwm::window :stream pane :single-box t)
       (with-stumpwm-formatting (pane :highlight (eq current-window win))
-        (present win 'stumpwm::window :stream pane :single-box t))))
+        (present win 'stumpwm::window :stream pane :single-box t))
+      ))
   (call-next-formatter other-formatters frame pane))
 
 (defun format-date (frame pane other-formatters)

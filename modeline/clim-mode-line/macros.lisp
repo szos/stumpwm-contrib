@@ -5,17 +5,25 @@
 
 (defmacro do-list-with-interspersed-element
     ((var list &body interspersed-forms) &body body)
-  (alexandria:with-gensyms (initial rest hold cont tmp)
-    `(flet ((,cont (,var)
-              ,@body))
-       (let* ((,hold ,list)
-              (,initial (car ,hold))
-              (,rest (cdr ,hold)))
-         (when ,initial
-           (,cont ,initial))
-         (dolist (,tmp ,rest)
-           ,@interspersed-forms
-           (,cont ,tmp))))))
+  (alexandria:with-gensyms (rest)
+    `(loop :for (,var ,rest) :on ,list
+           :do (progn ,@body)
+           :when ,rest
+             :do (progn ,@interspersed-forms))))
+
+;; (defmacro do-list-with-interspersed-element
+;;     ((var list &body interspersed-forms) &body body)
+;;   (alexandria:with-gensyms (initial rest hold cont tmp)
+;;     `(flet ((,cont (,var)
+;;               ,@body))
+;;        (let* ((,hold ,list)
+;;               (,initial (car ,hold))
+;;               (,rest (cdr ,hold)))
+;;          (when ,initial
+;;            (,cont ,initial))
+;;          (dolist (,tmp ,rest)
+;;            ,@interspersed-forms
+;;            (,cont ,tmp))))))
 
 (defmacro with-undrawn-output-record ((stream) &body body)
   (let ((s (gensym)))
@@ -34,19 +42,25 @@
            ,@body)))))
 
 (defmacro with-right-alignment ((frame pane) &body body)
-  (alexandria:with-gensyms (stream width record)
+  (alexandria:with-gensyms (stream width record cursor-x ;; top-level
+                                   )
     `(let* ((,stream ,pane)
+            (,cursor-x (stream-cursor-position ,stream))
+            ;; (,top-level (frame-top-level-sheet frame))
             (,record
               (with-output-recording-options (,stream :draw nil :record t)
                 (with-new-output-record (,stream)
                   ,@body)))
             (,width (mode-line-head-width ,frame)))
+       (declare (ignorable ,cursor-x))
        (multiple-value-bind (x y) (output-record-position ,record)
          (declare (ignore x))
          (multiple-value-bind (w h) (bounding-rectangle-size ,record)
-           (declare (ignore h))
+           (declare (ignorable h))
            (setf (output-record-position ,record)
-                 (values (- ,width w) y))))
+                 (values (- ,width w) y))
+           ;; (draw-rectangle* ,stream ,cursor-x 0 (- ,width w) h)
+           ))
        (tree-recompute-extent ,record)
        (replay ,record ,stream))))
 
