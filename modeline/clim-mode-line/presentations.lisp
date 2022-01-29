@@ -63,3 +63,8 @@
                                                   stumpwm::*window-format*
                                                   window))))
     (format stream "~A" str)))
+
+;;; Doesnt work, as stumpwm::head is a struct, not a class. 
+;; (define-presentation-method present
+;;     (head (type stumpwm::head) stream view &key)
+;;   (format nil "~d" (stumpwm::head-number (stumpwm:current-head))))

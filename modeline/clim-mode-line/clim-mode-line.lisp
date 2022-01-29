@@ -27,9 +27,12 @@ formatted to the output stream in between each formatter when in text mode.")
                                      'format-windows))
                :initarg :formatters
                :accessor mode-line-formatters)
-   (highlight-color :initform +red+
-                    :initarg :highlight-color
-                    :accessor mode-line-highlight-color)
+   (color-stack :initform nil
+                :initarg :color-stack
+                :accessor mode-line-color-stack)
+   (background-color :initform +white+
+                     :initarg :highlight-color
+                     :accessor mode-line-background-color)
    (foreground-color :initform +black+
                      :initarg :foreground-color
                      :accessor mode-line-foreground-color)
@@ -79,12 +82,17 @@ formatted to the output stream in between each formatter when in text mode.")
 (defvar *mode-line-display-function* 'display-mode-line-as-table)
 
 (defun display-mode-line (frame pane)
-  (with-text-style (pane ;; (frame-text-style frame)
-                    ;; TODO: We may need to 
-                    ;; (make-text-style "DejaVu Sans Mono" "Book" 14)
-                    (make-text-style nil nil nil) ; use default text style
-                    )
-    (funcall *mode-line-display-function* frame pane)))
+  (let ((*foreground-color* (mode-line-foreground-color frame))
+        (*background-color* (mode-line-background-color frame)))
+    (with-text-style (pane ;; (frame-text-style frame)
+                      ;; TODO: We may need to
+                      ;; (make-text-style nil :fix 14)
+                      (make-text-style "DejaVu Sans Mono" "Book" 14)
+                      ;; (make-text-style nil nil nil) ; use default text style
+                      )
+      (display-mode-line-as-text frame pane)
+      ;; (funcall *mode-line-display-function* frame pane)
+      )))
 
 (defun display-mode-line-as-table (frame pane)
   (with-table (pane)
@@ -94,7 +102,6 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (defun display-mode-line-as-text (frame pane)
   (dolist (line (mode-line-formatters frame))
-    (with-new-output-record )
     (funcall (car line) frame pane (cdr line))))
 
 ;; Glue between this and StumpWM
@@ -135,22 +142,42 @@ formatted to the output stream in between each formatter when in text mode.")
   (stumpwm:run-commands "restart-hard"))
 
 (defun redisp (frame)
-  (sb-thread:with-mutex ((mode-line-mutex frame))
-    (redisplay-frame-panes frame :force-p t)
-    (stumpwm:call-in-main-thread
-     (lambda ()
-       (sb-thread:with-mutex ((mode-line-mutex frame))
-         (let* ((sheet (frame-top-level-sheet frame))
-                (space (compose-space sheet))
-                (width (space-requirement-width space))
-                (height (space-requirement-height space)))
-           (move-and-resize-sheet sheet 0 0 width height))
-         (mapcar 'stumpwm::resize-mode-line
-                 stumpwm::*mode-lines*)
-         (mapcar (lambda (group)
-                   (mapcar (lambda (head)
-                             (stumpwm::group-sync-head
-                              group head))
-                           (stumpwm::group-heads group)))
-                 (stumpwm::screen-groups
-                  (stumpwm:current-screen))))))))
+  (if (stumpwm:in-main-thread-p)
+      (sb-thread:with-mutex ((mode-line-mutex frame))
+        (redisplay-frame-panes frame :force-p t)
+        (let* ((sheet (frame-top-level-sheet frame))
+               (space (compose-space sheet))
+               (width (space-requirement-width space))
+               (height (space-requirement-height space)))
+          (move-and-resize-sheet sheet 0 0 width height))
+        (mapcar 'stumpwm::resize-mode-line
+                stumpwm::*mode-lines*)
+        (mapcar (lambda (group)
+                  (mapcar (lambda (head)
+                            (stumpwm::group-sync-head
+                             group head))
+                          (stumpwm::group-heads group)))
+                (stumpwm::screen-groups
+                 (stumpwm:current-screen))))
+      (sb-thread:with-mutex ((mode-line-mutex frame))
+        (redisplay-frame-panes frame :force-p t)
+        (stumpwm:call-in-main-thread
+         (lambda ()
+           (sb-thread:with-mutex ((mode-line-mutex frame))
+             (let* ((sheet (frame-top-level-sheet frame))
+                    (space (compose-space sheet))
+                    (width (space-requirement-width space))
+                    (height (space-requirement-height space)))
+               (move-and-resize-sheet sheet 0 0 width height))
+             (mapcar 'stumpwm::resize-mode-line
+                     stumpwm::*mode-lines*)
+             (mapcar (lambda (group)
+                       (mapcar (lambda (head)
+                                 (stumpwm::group-sync-head
+                                  group head))
+                               (stumpwm::group-heads group)))
+                     (stumpwm::screen-groups
+                      (stumpwm:current-screen)))))))))
+
+(stumpwm:defcommand clm-redisplay () ()
+  (redisp *stumpwm-modeline-frame*))

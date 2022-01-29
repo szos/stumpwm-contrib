@@ -50,16 +50,50 @@
        (tree-recompute-extent ,record)
        (replay ,record ,stream))))
 
-(defmacro with-inverted-ink ((pane &rest drawing-options
-                              &key (ink '+flipping-ink+) fg-ink bg-ink
-                              &allow-other-keys)
-                             &body body)
-  (let ((p (gensym "PANE")))
-    `(let ((,p ,pane))
-       (surrounding-output-with-border (,p :ink ,(or bg-ink ink)
-                                           :filled t
-                                           :move-cursor nil)
-         (with-drawing-options (,p :ink ,(or fg-ink ink) ,@drawing-options)
+(defvar *background-color* nil)
+(defvar *foreground-color* nil)
+
+(defmacro with-background ((pane background-ink) &body body)
+  (alexandria:with-gensyms (stream)
+    `(let ((,stream ,pane)
+           (*background-color* ,background-ink))
+       (surrounding-output-with-border (,stream :ink *background-color*
+                                                :filled t
+                                                :move-cursor nil)
+         ,@body))))
+
+(defmacro with-foreground ((pane foreground-ink) &body body)
+  (alexandria:with-gensyms (stream)
+    `(let ((,stream ,pane)
+           (*foreground-color* ,foreground-ink))
+       (with-drawing-options (,stream :ink *foreground-color*)
+         ,@body))))
+
+(defmacro with-colors ((pane foreground-ink background-ink) &body body)
+  (alexandria:with-gensyms (stream temp-fg temp-bg)
+    `(let* ((,stream ,pane)
+            (,temp-fg ,foreground-ink)
+            (,temp-bg ,background-ink)
+            (*foreground-color* ,temp-bg)
+            (*background-color* ,temp-fg))
+       (surrounding-output-with-border (,stream :ink *background-color*
+                                                :filled t
+                                                :move-cursor nil)
+         (with-drawing-options (,stream :ink *foreground-color*)
+           ,@body)))))
+
+(defmacro with-inverted-ink ((pane &rest drawing-options) &body body)
+  (alexandria:with-gensyms (stream ;; frame
+                                   )
+    `(let ((,stream ,pane)
+           ;; (,frame (pane-frame ,pane))
+           )
+       (with-colors (,stream *background-color*
+                             ;;(mode-line-background-color ,frame)
+                             *foreground-color*
+                             ;; (mode-line-foreground-color ,frame)
+                             )
+         (with-drawing-options (,stream ,@drawing-options)
            ,@body)))))
 
 (defmacro with-table ((pane &rest options) &body body)
@@ -83,6 +117,11 @@
     `(flet ((,cont ()
               ,@body))
        (declare (dynamic-extent (function ,cont)))
+       ;; (surrounding-output-with-border (,stream :ink *background-color*
+       ;;                                          :filled t
+       ;;                                          :move-cursor nil)
+       ;;   (with-drawing-options (,stream :ink *foreground-color*)
+       ;;     ,@body))
        (case *display-style*
          ((:text) (funcall #',cont))
          ((:table) (formatting-cell (,pane :align-x *align-x*)
