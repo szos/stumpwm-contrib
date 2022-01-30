@@ -46,10 +46,17 @@ formatted to the output stream in between each formatter when in text mode.")
                      :accessor mode-line-height))
   (:panes (display :application
                    :display-function 'display-mode-line
+                   :incremental-redisplay t
                    :scroll-bars nil
                    :borders nil))
   (:layouts
    (default display)))
+
+(defgeneric frame-compose-space (frame)
+  (:method ((frame mode-line))
+    (let ((space (compose-space (find-pane-named frame 'display))))
+      (values (mode-line-head-width frame)
+              (- (space-requirement-height space) 1)))))
 
 (defmethod (setf mode-line-formatters) (new (frame mode-line))
   (sb-thread:with-mutex ((mode-line-mutex frame))
@@ -59,11 +66,13 @@ formatted to the output stream in between each formatter when in text mode.")
      (lambda ()
        (sb-thread:with-mutex ((mode-line-mutex frame))
          (let* ((top-level-sheet (frame-top-level-sheet frame))
-                (sheet (find-pane-named frame 'display))
-                (space (compose-space sheet))
-                (width (space-requirement-width space))
-                (height (space-requirement-height space)))
-           (move-and-resize-sheet top-level-sheet 0 0 width height))
+                ;; (sheet (find-pane-named frame 'display))
+                ;; (space (compose-space sheet))
+                ;; (width (space-requirement-width space))
+                ;; (height (space-requirement-height space))
+                )
+           (multiple-value-bind (width height) (frame-compose-space frame)
+             (move-and-resize-sheet top-level-sheet 0 0 width height)))
          (mapcar 'stumpwm::resize-mode-line
                  stumpwm::*mode-lines*)
          (mapcar (lambda (group)
@@ -72,8 +81,7 @@ formatted to the output stream in between each formatter when in text mode.")
                               group head))
                            (stumpwm::group-heads group)))
                  (stumpwm::screen-groups
-                  (stumpwm:current-screen))))))
-    ))
+                  (stumpwm:current-screen))))))))
 
 (defun mode-line-format ()
   (mode-line-formatters *stumpwm-modeline-frame*))
@@ -89,22 +97,7 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (defun display-mode-line-output (frame pane)
   (dolist (line (mode-line-formatters frame))
-    (block line-block
-      (loop for (el . rest) on line
-            do (case el
-                 ((:align-right)
-                  ;; We should change this. Basically, dont use
-                  ;; the with-right-alignment macro, but instead
-                  ;; do it explicitly so that we get access to the
-                  ;; x y w h of the output record and we can not
-                  ;; only move the output record but also draw a
-                  ;; rectangle between the old origin and the new
-                  ;; origin in the background color
-                  (return-from line-block
-                    (with-right-alignment (frame pane)
-                      (loop for el2 in rest
-                            do (funcall el2 frame pane)))))
-                 (t (funcall el frame pane)))))))
+    (funcall (car line) frame pane (cdr line))))
 
 (defun display-mode-line (frame pane)
   (with-text-style (pane ;; (frame-text-style frame)
