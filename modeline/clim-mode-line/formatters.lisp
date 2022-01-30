@@ -68,8 +68,15 @@
         (tree-recompute-extent record)
         (replay record pane)))))
 
-(defun format-groups (frame pane other-formatters
-                      )
+(defun make-color-formatter (foreground background highlight-fg highlight-bg)
+  (lambda (frame pane others)
+    (let ((*foreground-color* foreground)
+          (*background-color* background)
+          (*highlight-foreground-color* highlight-fg)
+          (*highlight-background-color* highlight-bg))
+      (call-next-formatter others frame pane nil))))
+
+(defun format-groups (frame pane other-formatters)
   (declare (ignorable frame))
   (let ((current-group (stumpwm:current-group)))
     (do-list-with-interspersed-element
@@ -77,11 +84,9 @@
           (format pane " "))
       (with-stumpwm-formatting (pane :highlight (eq current-group group))
         (present group 'stumpwm::group :stream pane :single-box t))))
-  (call-next-formatter other-formatters frame pane)
-  )
+  (call-next-formatter other-formatters frame pane))
 
-(defun format-windows (frame pane other-formatters
-                       )
+(defun format-windows (frame pane other-formatters)
   (let ((current-window (stumpwm:current-window)))
     (do-list-with-interspersed-element
         (win (stumpwm::sort-windows-by-number
@@ -89,5 +94,63 @@
           (format pane " "))
       (with-stumpwm-formatting (pane :highlight (eq current-window win))
         (present win 'stumpwm::window :stream pane :single-box t))))
-  (call-next-formatter other-formatters frame pane)
-  )
+  (call-next-formatter other-formatters frame pane))
+
+;;;; REIMPLEMENT STANDARD FORMATTERS
+
+(define-formatter (fmt-urgent-window-list) (frame pane)
+  (let ((curwin (stumpwm:current-window))
+        (windows (stumpwm::screen-urgent-windows (stumpwm::current-screen))))
+    (do-list-with-interspersed-element (win windows (format pane " "))
+      (with-stumpwm-formatting (pane :highlight (eq win curwin))
+        (present win 'stumpwm::window :stream pane :single-box t)))))
+
+(define-formatter (fmt-window-list) (frame pane)
+  (let ((windows (stumpwm::sort-windows (stumpwm:current-group))))
+    (do-list-with-interspersed-element (win windows (format pane " "))
+      (with-stumpwm-formatting (pane)
+        (present win 'stumpwm::window :stream pane :single-box t)))))
+
+(define-formatter (fmt-group-list) (frame pane)
+  (let ((curgrp (stumpwm:current-group))
+        (groups (stumpwm::sort-groups (stumpwm:current-screen))))
+    (do-list-with-interspersed-element (group groups (format pane " "))
+      (with-stumpwm-formatting (pane :highlight (eq group curgrp))
+        (present group 'stumpwm::group :stream pane :single-box t)))))
+
+(define-formatter (fmt-head) (frame pane)
+  (with-stumpwm-formatting (pane)
+    (format pane "~d" (stumpwm::head-number (stumpwm:current-head)))))
+
+(define-formatter (fmt-group) (frame pane)
+  (let ((group (stumpwm:current-group)))
+    (with-stumpwm-formatting (pane)
+      (with-output-as-presentation (pane group 'stumpwm::group :single-box t)
+        (format pane "~A" (stumpwm:group-name group))))))
+
+(define-formatter (fmt-head-window-list) (frame pane)
+  (let* ((group (stumpwm:current-group))
+         (curwin (stumpwm:group-current-window group))
+         (windows
+           (stumpwm::sort1
+            (stumpwm::head-windows group (stumpwm:group-current-head group))
+            #'< :key #'stumpwm::window-number)))
+    (do-list-with-interspersed-element (win windows (format pane " "))
+      (with-stumpwm-formatting (pane :highlight (eq win curwin))
+        (present win 'stumpwm::window :stream pane :single-box t)))))
+
+(define-formatter (fmt-head-window-list-hidden-windows) (frame pane)
+  (let* ((group (stumpwm:current-group))
+         (head (stumpwm:current-head group))
+         (curwin (stumpwm:group-current-window group))
+         (windows
+           (stumpwm::sort1 (stumpwm::head-windows group head)
+                           #'<
+                           :key #'stumpwm::window-number)))
+    (do-list-with-interspersed-element (win windows (format pane " "))
+      (with-stumpwm-formatting (pane :highlight (eq win curwin))
+        (present win 'stumpwm::window :stream pane :single-box t)))))
+
+(define-formatter (fmt-modeline-time) (frame pane)
+  (with-stumpwm-formatting (pane)
+    (format pane "~A" (stumpwm:time-format stumpwm:*time-modeline-string*))))

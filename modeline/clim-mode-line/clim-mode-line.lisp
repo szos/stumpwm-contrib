@@ -101,7 +101,11 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (defun display-mode-line (frame pane)
   (with-text-style (pane ;; (frame-text-style frame)
-                    ;; TODO: We may need to 
+                    ;; TODO: We may need to run some sort of initialization
+                    ;; function before using text styles beyond the
+                    ;; default. This function is evidently called after running
+                    ;; the font picker included in :clim-examples (run
+                    ;; clim-demo:demodemo). 
                     (make-text-style "DejaVu Sans Mono" "Book" 14)
                     ;; (make-text-style nil nil nil) ; use default text style
                     )
