@@ -101,10 +101,25 @@ formatted to the output stream in between each formatter when in text mode.")
                   ;; rectangle between the old origin and the new
                   ;; origin in the background color
                   (return-from line-block
-                    (with-right-alignment (frame pane)
-                      (loop for el2 in rest
-                            do (funcall el2 frame pane)))))
-                 (t (funcall el frame pane)))))))
+                    (let ((head-width (mode-line-head-width frame))
+                          (record
+                            (with-undrawn-output-record (pane)
+                              (loop for el2 in rest
+                                    do (funcall el2 frame pane)))))
+                      (with-output-record-bounds (x y w h) record
+                        (setf (output-record-position record)
+                              (values (- head-width w) y))
+                        (setf (mode-line-width frame) h)
+                        (tree-recompute-extent record)
+                        (replay record pane)
+                        (draw-rectangle* pane x y (- head-width w) h
+                                         :ink *background-color*)))
+                    ;; (with-right-alignment (frame pane)
+                    ;;   (loop for el2 in rest
+                    ;;         do (funcall el2 frame pane)))
+                    ))
+                 (t (funcall el frame pane)
+                  (format pane " ")))))))
 
 (defun display-mode-line (frame pane)
   (with-text-style (pane ;; (frame-text-style frame)
@@ -198,11 +213,14 @@ formatted to the output stream in between each formatter when in text mode.")
     (sb-thread:with-mutex ((mode-line-mutex frame))
       (redisplay-frame-panes frame :force-p t) 
       (let* ((top-level-sheet (frame-top-level-sheet frame))
-             (width (mode-line-head-width frame))
-             (height (mode-line-height frame)))
+             (space (compose-space top-level-sheet))
+             (width (space-requirement-width space))
+             (height (space-requirement-height space))
+             ;; (width (mode-line-head-width frame))
+             ;; (height (mode-line-height frame))
+             )
         (move-and-resize-sheet top-level-sheet 0 0 width height))
-      (mapcar 'stumpwm::resize-mode-line
-              stumpwm::*mode-lines*)
+      (mapcar 'stumpwm::resize-mode-line stumpwm::*mode-lines*)
       (mapcar (lambda (group)
                 (mapcar (lambda (head)
                           (stumpwm::group-sync-head

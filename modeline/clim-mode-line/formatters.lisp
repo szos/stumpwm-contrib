@@ -1,41 +1,23 @@
 (in-package #:clim-mode-line)
 
-(defparameter *background-color* +white+)
-(defparameter *foreground-color* +black+)
+(defparameter *background-color* +black+ )
+(defparameter *foreground-color* +white+ )
 (defparameter *highlight-background-color* +black+)
 (defparameter *highlight-foreground-color* +white+)
 
 (defun invoke-with-stumpwm-formatting (pane cont highlight-when)
   (let ((highlight (funcall highlight-when)))
-    ;; (with-drawing-options (pane :ink *foreground-color*)
-    ;;   (surrounding-output-with-border (pane :ink (if highlight
-    ;;                                                  *highlight-color*
-    ;;                                                  ;; *background-color*
-    ;;                                                  +background-ink+)
-    ;;                                         :filled nil
-    ;;                                         :move-cursor nil)
-    ;;     (funcall cont)))
-    ;; (surrounding-output-with-border (pane :ink (if highlight
-    ;;                                                *highlight-color*
-    ;;                                                ;; *background-color*
-    ;;                                                +background-ink+)
-    ;;                                       :filled nil
-    ;;                                       :move-cursor nil)
-      (surrounding-output-with-border (pane :ink (if highlight
-                                                     *highlight-background-color*
-                                                     ;; *background-color*
-                                                     *background-color*)
-                                            :filled t
-                                            :move-cursor nil)
-        (with-drawing-options (pane :ink (if highlight
-                                             *highlight-foreground-color*
-                                             *foreground-color*)
-                                    ;; *foreground-color*
-                                    )
-          (funcall cont))
-        )
-    ;;   )
-    ))
+    (surrounding-output-with-border (pane :ink (if highlight
+                                                   *highlight-background-color*
+                                                   ;; *background-color*
+                                                   *background-color*)
+                                          :filled t
+                                          :move-cursor nil)
+      
+      (with-drawing-options (pane :ink (if highlight
+                                           *highlight-foreground-color*
+                                           *foreground-color*))
+        (funcall cont)))))
 
 (defmacro with-stumpwm-formatting ((pane &key highlight) &body body)
   (alexandria:with-gensyms (cont high)
