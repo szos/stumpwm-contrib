@@ -23,8 +23,8 @@ formatted to the output stream in between each formatter when in text mode.")
 
 (define-application-frame mode-line ()
   ((formatters :initform (list (list 'format-groups
-                                     ;; 'format-align-right
-                                     :align-right
+                                     'format-align-right
+                                     ;; :align-right
                                      'format-windows))
                :initarg :formatters
                :accessor mode-line-formatters)
@@ -102,8 +102,8 @@ formatted to the output stream in between each formatter when in text mode.")
 (defun display-mode-line (frame pane)
   (with-text-style (pane ;; (frame-text-style frame)
                     ;; TODO: We may need to 
-                    (make-text-style "DejaVu Sans Mono" "Book" 14)
-                    ;; (make-text-style nil nil nil) ; use default text style
+                    ;; (make-text-style "DejaVu Sans Mono" "Book" 14)
+                    (make-text-style nil nil nil) ; use default text style
                     )
     (let ((record
             (with-output-recording-options (pane :draw nil :record t)

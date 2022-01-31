@@ -64,7 +64,7 @@
     (multiple-value-bind (x y) (output-record-position record)
       (multiple-value-bind (w h) (bounding-rectangle-size record)
         (setf (output-record-position record) (values (- width w) y))
-        (draw-rectangle* pane x y (- width w) h :ink *background-color*)
+        (draw-rectangle* pane x y (- width w) (- h 4) :ink *background-color*)
         (tree-recompute-extent record)
         (replay record pane)))))
 
