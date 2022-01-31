@@ -2,8 +2,8 @@
 
 (defparameter *background-color* +white+)
 (defparameter *foreground-color* +black+)
-(defparameter *highlight-background-color* +blue+)
-(defparameter *highlight-foreground-color* +blue+)
+(defparameter *highlight-background-color* +black+)
+(defparameter *highlight-foreground-color* +white+)
 
 (defun invoke-with-stumpwm-formatting (pane cont highlight-when)
   (let ((highlight (funcall highlight-when)))
@@ -22,12 +22,16 @@
     ;;                                       :filled nil
     ;;                                       :move-cursor nil)
       (surrounding-output-with-border (pane :ink (if highlight
-                                                     *highlight-color*
+                                                     *highlight-background-color*
                                                      ;; *background-color*
-                                                     +background-ink+)
+                                                     *background-color*)
                                             :filled t
                                             :move-cursor nil)
-        (with-drawing-options (pane :ink *foreground-color*)
+        (with-drawing-options (pane :ink (if highlight
+                                             *highlight-foreground-color*
+                                             *foreground-color*)
+                                    ;; *foreground-color*
+                                    )
           (funcall cont))
         )
     ;;   )
