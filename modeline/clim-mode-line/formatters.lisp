@@ -21,8 +21,19 @@
 (define-formatter slash "/")
 
 (defun format-align-right (frame pane other-formatters)
-  (with-right-alignment (frame pane)
-    (call-next-formatter other-formatters frame pane)))
+  (let ((width (mode-line-head-width frame))
+        (record
+          (with-output-recording-options (pane :draw nil :record t)
+            (with-new-output-record (pane)
+              (call-next-formatter other-formatters frame pane)))))
+    (multiple-value-bind (x y) (output-record-position record)
+      (declare (ignorable x y))
+      (multiple-value-bind (w h) (bounding-rectangle-size record)
+        (declare (ignorable w h))
+        (setf (output-record-position record) (values (- width w) y))
+        ;; (draw-rectangle* pane x y (- width w) h :filled nil)
+        (tree-recompute-extent record)
+        (replay record pane)))))
 
 (defun invoke-with-normal-stumpwm-highlighting (pane highlight-thunk continuation)
   "When HIGHLIGHT-THUNK is returns true, invoke CONTINUATION with the StumpWM
@@ -127,6 +138,6 @@ called within a table, invoke CONTINUATION within a cell."
         (win (stumpwm::sort-windows-by-number
               (stumpwm:group-windows (stumpwm:current-group)))
           (format pane " "))
-      (with-normal-stumpwm-highlighting (pane (eq current-window win))
+      (with-stumpwm-highlighting (pane (eq current-window win))
         (present win 'stumpwm::window :stream pane :single-box t))))
   (call-next-formatter other-formatters frame pane))

@@ -44,9 +44,8 @@ formatted to the output stream in between each formatter when in text mode.")
   (:layouts
    (default display)))
 
-(defmethod (setf mode-line-formatters) (new (frame mode-line))
+(defun redisp (frame)
   (sb-thread:with-mutex ((mode-line-mutex frame))
-    (setf (slot-value frame 'formatters) new)
     (redisplay-frame-panes frame :force-p t)
     (stumpwm:call-in-main-thread
      (lambda ()
@@ -55,7 +54,7 @@ formatted to the output stream in between each formatter when in text mode.")
                 (space (compose-space sheet))
                 (width (space-requirement-width space))
                 (height (space-requirement-height space)))
-           (move-and-resize-sheet sheet 0 0 width height))
+           (move-and-resize-sheet sheet 0 0 width (- height 1)))
          (mapcar 'stumpwm::resize-mode-line
                  stumpwm::*mode-lines*)
          (mapcar (lambda (group)
@@ -65,6 +64,32 @@ formatted to the output stream in between each formatter when in text mode.")
                            (stumpwm::group-heads group)))
                  (stumpwm::screen-groups
                   (stumpwm:current-screen))))))))
+
+(defmethod (setf mode-line-formatters) (new (frame mode-line))
+  (sb-thread:with-mutex ((mode-line-mutex frame))
+    (setf (slot-value frame 'formatters) new))
+  (redisp frame)
+  ;; (sb-thread:with-mutex ((mode-line-mutex frame))
+  ;;   (setf (slot-value frame 'formatters) new)
+  ;;   (redisplay-frame-panes frame :force-p t)
+  ;;   (stumpwm:call-in-main-thread
+  ;;    (lambda ()
+  ;;      (sb-thread:with-mutex ((mode-line-mutex frame))
+  ;;        (let* ((sheet (frame-top-level-sheet frame))
+  ;;               (space (compose-space sheet))
+  ;;               (width (space-requirement-width space))
+  ;;               (height (space-requirement-height space)))
+  ;;          (move-and-resize-sheet sheet 0 0 width height))
+  ;;        (mapcar 'stumpwm::resize-mode-line
+  ;;                stumpwm::*mode-lines*)
+  ;;        (mapcar (lambda (group)
+  ;;                  (mapcar (lambda (head)
+  ;;                            (stumpwm::group-sync-head
+  ;;                             group head))
+  ;;                          (stumpwm::group-heads group)))
+  ;;                (stumpwm::screen-groups
+  ;;                 (stumpwm:current-screen)))))))
+  )
 
 (defun mode-line-format ()
   (mode-line-formatters *stumpwm-modeline-frame*))
@@ -76,13 +101,13 @@ formatted to the output stream in between each formatter when in text mode.")
   "this method sets the window type via clim-clx::adopt-frame as defined below."
   :dock)
 
-(defvar *mode-line-display-function* 'display-mode-line-as-table)
+(defvar *mode-line-display-function* 'display-mode-line-as-text)
 
 (defun display-mode-line (frame pane)
   (with-text-style (pane ;; (frame-text-style frame)
                     ;; TODO: We may need to 
-                    ;; (make-text-style "DejaVu Sans Mono" "Book" 14)
-                    (make-text-style nil nil nil) ; use default text style
+                    (make-text-style "DejaVu Sans Mono" "Book" 14)
+                    ; (make-text-style nil nil nil) ; use default text style
                     )
     (funcall *mode-line-display-function* frame pane)))
 
@@ -132,24 +157,3 @@ formatted to the output stream in between each formatter when in text mode.")
     (execute-frame-command *stumpwm-modeline-frame* '(com-quit)))
   (setf *stumpwm-modeline-frame* nil)
   (stumpwm:run-commands "restart-hard"))
-
-(defun redisp (frame)
-  (sb-thread:with-mutex ((mode-line-mutex frame))
-    (redisplay-frame-panes frame :force-p t)
-    (stumpwm:call-in-main-thread
-     (lambda ()
-       (sb-thread:with-mutex ((mode-line-mutex frame))
-         (let* ((sheet (frame-top-level-sheet frame))
-                (space (compose-space sheet))
-                (width (space-requirement-width space))
-                (height (space-requirement-height space)))
-           (move-and-resize-sheet sheet 0 0 width height))
-         (mapcar 'stumpwm::resize-mode-line
-                 stumpwm::*mode-lines*)
-         (mapcar (lambda (group)
-                   (mapcar (lambda (head)
-                             (stumpwm::group-sync-head
-                              group head))
-                           (stumpwm::group-heads group)))
-                 (stumpwm::screen-groups
-                  (stumpwm:current-screen))))))))
